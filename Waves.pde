@@ -59,7 +59,7 @@ class FadeCurve {
 }
 
 class Wave {
-    float gravity = -random(0.5, 2);
+    float gravity = -random(1, 2.5);
     float turbulance = 2;
     ArrayList<Verlet> wave_line = new ArrayList<Verlet>();
     ArrayList<FadeCurve> wave_lines = new ArrayList<FadeCurve>();
@@ -81,12 +81,12 @@ class Wave {
             float x = i*width/(wave_length - 3) - width/(wave_length - 3);
             if (left){
                 PVector point = new PVector(x, random(-45-i*2, -5-i*2));
-                PVector force = new PVector(0, random(10*speeddiv, 23*speeddiv));
+                PVector force = new PVector(0, random(10*speeddiv, 20*speeddiv));
                 Verlet ver = new Verlet(point, force);
                 wave_line.add(ver);
             } else {
                 PVector point = new PVector(x, random(-60+i*2, -30+i*2));
-                PVector force = new PVector(0, random(10*speeddiv, 23*speeddiv));
+                PVector force = new PVector(0, random(10*speeddiv, 20*speeddiv));
                 Verlet ver = new Verlet(point, force);
                 wave_line.add(ver);
             }

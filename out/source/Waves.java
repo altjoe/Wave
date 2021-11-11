@@ -14,211 +14,222 @@ import java.io.IOException;
 
 public class Waves extends PApplet {
 
-ArrayList<Wave> waves;
-float speeddiv = 10;
+float speeddiv = 20;
+float wavemagmax;
+ArrayList<Wave> waves = new ArrayList<Wave>();
 public void setup() {
     
     background(255);
-    speeddiv = 1.0f / speeddiv;
-    waves = new ArrayList<Wave>();
-    Wave wave = new Wave();
+    wavemagmax = sqrt(width*width + height*height);
+
+    // new_wave();
+    for (int i = 0; i < 2; i++){
+        new_wave();
+    }
+}   
+
+int wavedirections = 30;
+int wavecount = 0;
+public void new_wave(){
+    float angle = 2*PI/wavedirections;
+    angle *= wavecount;//int(random(0, wavedirections + 1));
+    PVector loc = circlexy(angle, wavemagmax/2);
+    Wave wave = new Wave(loc.x, loc.y, angle);
     waves.add(wave);
+    wavecount += 1;
 }
-int newwave = 100;
+
+public PVector circlexy(float angle, float radius){
+    float x = radius * cos(angle) + width/2;
+    float y = radius * sin(angle) + height/2;
+    PVector loc = new PVector(x, y);
+    return loc;
+}
 int newwavecount = 0;
+int newwaveinterval = 15;
 public void draw() {
     background(255);
-    for (int i = waves.size() - 1; i >= 0; i--){
-        if (!waves.get(i).finished){
-            // println("Ran");
-            waves.get(i).move();
-            waves.get(i).display();
+    for (int i = waves.size()-1; i >= 0; i--) {
+        Wave wave = waves.get(i);
+        if (!wave.finished){
+            wave.move();
+            wave.display();
         } else {
             waves.remove(i);
-        }
+        } 
     }
-    if (newwavecount > newwave){
-        Wave wave = new Wave();
-        waves.add(wave);
-        newwavecount = 0; 
-        newwave = PApplet.parseInt(random(100, 200));
+    if (newwavecount > newwaveinterval){
+        new_wave();
+        newwavecount = 0;
+        newwaveinterval = PApplet.parseInt(random(15, 30));
     }
+
     newwavecount += 1;
 }
 
-class FadeCurve {
-    int fadetime = PApplet.parseInt(random(60,120));
-    int display_count = 0;
-    boolean finished = false;
-    PVector[] curve;
-
-    public FadeCurve(PVector[] c){
-        curve = c;
+class FadeLines {
+    PVector[] points;
+    int frames = 60;
+    float sw;
+    int alivecount;
+    boolean dead = false;
+    public FadeLines(ArrayList<PVector> lst, float sw){
+        points = new PVector[lst.size()];
+        for (int i = 0; i < lst.size(); i++) {
+            points[i] = lst.get(i);
+        }
+        this.sw = sw;
+        alivecount = frames;
     }
 
-    public void display() {
-        if (display_count < fadetime){
+    public void display(){
+        if (alivecount > 0){
             noFill();
-            float perc = PApplet.parseFloat(fadetime - display_count) / PApplet.parseFloat(fadetime);
-            stroke(0, 0, 0, 255.0f * (perc));
+            float perc = PApplet.parseFloat(alivecount) / PApplet.parseFloat(frames);
+            strokeWeight(sw * perc);
+            stroke(0,0,0, 255 * perc);
             beginShape();
-            for (int j = 0; j < curve.length; j++){
-                curveVertex(curve[j].x, curve[j].y);
+            for (PVector point : points) {
+                curveVertex(point.x, point.y);
             }
             endShape();
-            display_count += 1;
+            alivecount -= 1;
         } else {
-            finished = true;
+            dead = true;
         }
         
     }
 }
 
 class Wave {
-    float gravity = -random(1, 2.5f);
-    float turbulance = 2;
-    ArrayList<Verlet> wave_line = new ArrayList<Verlet>();
-    ArrayList<FadeCurve> wave_lines = new ArrayList<FadeCurve>();
-    int wave_length = 30;
-    boolean left = true;
+    PVector loc;
+    PVector dim;
+    float gravity = 0.175f/speeddiv;
+    float rotation;
+    int segments = 40;
+    ArrayList<PVector> points = new ArrayList<PVector>();
+    ArrayList<PVector> prev_points = new ArrayList<PVector>();
+    boolean starting = true;
     boolean finished = false;
-    boolean juststarted = true;
+    float sw;
 
-    public Wave() {
-        if (PApplet.parseInt(random(0,2)) == 1){
-            left = false;
-        }
-        start_wave();
+    ArrayList<FadeLines> fadelines = new ArrayList<FadeLines>();
+
+    public Wave(float x, float y, float r){     // rotation at 0 gravity goes down at PI goes up
+        r += PI/2;
+        loc = new PVector(x, y);
+        rotation = r;
+        startwave();
+        sw = random(1, 2.5f);
     }
 
-    public void start_wave() {
+    public Wave(PVector loc0, float r){     // rotation at 0 gravity goes down at PI goes up
+        loc = loc;
+        rotation = r;
+        startwave();
+    }
 
-        for (int i = 0; i < wave_length; i++){
-            float x = i*width/(wave_length - 3) - width/(wave_length - 3);
-            if (left){
-                PVector point = new PVector(x, random(-45-i*2, -5-i*2));
-                PVector force = new PVector(0, random(10*speeddiv, 20*speeddiv));
-                Verlet ver = new Verlet(point, force);
-                wave_line.add(ver);
+    public Wave(float x, float y, float r, int s){
+        loc = new PVector(x, y);
+        rotation = r;
+        segments = s;
+    }
+
+    public void startwave(){
+        for (int i = 0; i <= segments; i++){
+            float x = wavemagmax * i / (segments - 3) - wavemagmax*2/(segments-3);
+            x -= wavemagmax/2;
+            float y = -random(5, 50);
+            if (PApplet.parseInt(random(0, 2)) == 1) {
+                y -= i * 2;
             } else {
-                PVector point = new PVector(x, random(-60+i*2, -30+i*2));
-                PVector force = new PVector(0, random(10*speeddiv, 20*speeddiv));
-                Verlet ver = new Verlet(point, force);
-                wave_line.add(ver);
+                y += i * 2;
             }
-            
-        }
 
-        for (int j = 0; j <= 1; j++){
-            for (int i = 1; i < wave_line.size(); i++){
-                Verlet prev = wave_line.get(i-1);
-                wave_line.get(i).convolve(prev);
-            }
+            float force = random(30, 50)/speeddiv;
+            prev_points.add(new PVector(x, y - force));
+            points.add(new PVector(x, y));
         }
-        if (visible()){
-            PVector[] arr = snapshot();
-            FadeCurve curve = new FadeCurve(arr);
-            wave_lines.add(curve);
-        }
-       
-    }
-
-
-
-    public void display() {
-        for (int i = wave_lines.size()-1; i >= 0; i--){
-            FadeCurve curve = wave_lines.get(i);
-            if (!curve.finished){
-                curve.display();
-            } else {
-                wave_lines.remove(i);
-            }
-        }
-        noFill();
-        stroke(0);
-        beginShape();
-        for (int j = 0; j < wave_line.size(); j++){
-            curveVertex(wave_line.get(j).current.x, wave_line.get(j).current.y);
-        }
-        endShape();
-
-        if (wave_lines.size() == 0 && !juststarted){
-            finished = true;
-        } else if (visible() && juststarted){
-            juststarted = false;
-        }
-    }
-    int count = 0;
-    int drawn_line_freq = 8;
-
-    public void move() {
-        for (int i = 0; i < wave_line.size(); i++){
-            wave_line.get(i).next();
-        }
-
-        count += 1;
-        if (count >= drawn_line_freq && visible()){
-            PVector[] arr = snapshot();
-            FadeCurve curve = new FadeCurve(arr);
-            wave_lines.add(curve);
-            count = 0;
-        }
-    }
-
-    public PVector[] snapshot(){
-        PVector[] arr = new PVector[wave_line.size()];
-        for (int i = 0; i < wave_line.size(); i++){
-            arr[i] = wave_line.get(i).current;
-        }
-        return arr;
+        convolve(2);
     }
 
     public boolean visible(){
-        for (int i = 0; i < wave_line.size(); i++){
-            if (wave_line.get(i).current.y > 0){
+        for (int i = 0; i < points.size(); i++){
+            if (points.get(i).y >= 0) {
                 return true;
             }
         }
         return false;
     }
+
+    int fadeinterval = 7;
+    int fadecounter = 0;
+    public void display(){
+        pushMatrix();
+        translate(loc.x, loc.y);
+        rotate(rotation);
+        for (int i = fadelines.size()-1; i >= 0; i--){
+            FadeLines line = fadelines.get(i);
+            if (!line.dead){
+                line.display();
+            } else {
+                fadelines.remove(i);
+            }
+            
+        }
+        stroke(0);
+        strokeWeight(sw);
+        noFill();
+        beginShape();
+        for (PVector point : points) {
+            curveVertex(point.x, point.y);
+        }
+        endShape();
+        popMatrix();
+        
+        if (!visible() && !starting){
+            finished = true;
+        } else if (visible() && starting) {
+            starting = false;
+        }
+
+        if (fadecounter > fadeinterval) {
+            FadeLines line = new FadeLines(points, sw);
+            fadelines.add(line);
+            fadecounter = 0;
+        }
+        fadecounter += 1;
+    }
+
+    public void move(){
+        for (int i = 0; i < points.size(); i++) {
+            PVector current = points.get(i);
+            PVector previous = prev_points.get(i);
+            PVector diff = PVector.sub(current, previous);
+            prev_points.set(i, current);
+            current = PVector.add(current, diff);
+            current.y -= gravity;
+            points.set(i, current);
+        }
+    }
+
+    public void convolve(int times){
+        for (int i = 0; i < times; i++){
+            for (int j = 1; j < points.size(); j++){
+                PVector prev = points.get(j-1);
+                PVector current = points.get(j);
+                current.y = (prev.y + current.y) / 2;
+                points.set(j, current);
+
+                PVector prev0 = prev_points.get(j-1);
+                PVector current0 = prev_points.get(j);
+                current0.y = (prev0.y + current0.y) / 2;
+                prev_points.set(j, current0);
+            }
+        }
+        
+    }
 }
-
-class Verlet {
-    PVector prev;
-    PVector current;
-    PVector gravity = new PVector(0, -0.05f * speeddiv); 
-
-    public Verlet(PVector pos, PVector force){
-        current = pos;
-        prev = PVector.sub(current, force);
-    }
-
-    public void next(){
-        PVector diff = PVector.sub(current, prev);
-        diff = PVector.add(diff, gravity);
-        prev = current;
-        current = PVector.add(current, diff);
-    }
-
-    public void convolve(Verlet v) {
-        float prevx = prev.x;
-        prev = PVector.div(PVector.add(v.prev, prev), 2.0f);
-        current = PVector.div(PVector.add(v.current, current), 2.0f);
-        prev.x = prevx;
-        current.x = prevx;
-    }
-}
-
-/*
-The farther away from the start the weaker the force acting upon it is 
-    - can be gravity 
-    - might look into distance related force
-Would like turbulance of previous wave and new one 
-    - can be force used similar to gravity at certain point
-        - point can be when it has pass previous wave?
-a
-
-*/
   public void settings() {  size(512, 512); }
   static public void main(String[] passedArgs) {
     String[] appletArgs = new String[] { "Waves" };
